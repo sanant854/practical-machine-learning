@@ -1,0 +1,148 @@
+---
+title: "Practical Machine Learning"
+author: "Anant Sharma"
+date: "7/23/2019"
+output: html_document
+---
+
+About the Project
+===========
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. The goal of our project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set and then apply our machine learning algorithm to the 20 test cases available in the test data. 
+
+Loading the data
+================
+
+  ```{r load,cache=TRUE}
+    setwd("C:/Users/Anant Sharma/Desktop/DATA SCIENCE/Practical Machine Learning/Project")
+    training<-read.csv("pml-training.csv")
+    validation<-read.csv("pml-testing.csv")
+    
+  ```  
+
+Removing NA values
+==================
+
+  ```{r na}
+    training<-training[,colSums(is.na(training))==0]
+    validation<-validation[,colSums(is.na(training))==0]
+  ```
+  
+Splitting data
+===============
+  ```{r split}
+    library(caret)
+    set.seed(333)
+    intrain<-createDataPartition(y=training$classe,p=0.7,list=FALSE)
+    subtrain<-training[intrain,]
+    subtest<-training[-intrain,]
+    dim(subtrain)
+    dim(subtest)
+  ```  
+Looking for near zero variance predictors
+===============
+Clearly from the analysis given below there were 34 variables which had nearly zero variance or were same most of the time and hence they are removed from our analysis.
+
+  ```{r nzv}
+    nzv<-nearZeroVar(subtrain)
+    subtrain<-subtrain[,-nzv]
+    subtest<-subtest[,-nzv]
+    dim(subtrain)
+  ```  
+
+Highly correlated variables
+==================
+
+We can remove highly correlated variables using principal component analysis and replace them with better predictors.Hence 29 variables are removed which can make our analysis easier.
+
+ ```{r pca}
+  proc<-preProcess(subtrain[,-59],method="pca")
+  trainproc<-predict(proc,subtrain)
+  testproc<-predict(proc,subtest)
+  dim(trainproc)
+  dim(testproc)
+  ```  
+  
+Testing models
+==================
+
+We would be trying out three models classsication tree,random forest and general boosting with tree.
+
+1. Classification trees
+2. Random forest
+3. Boosting with trees
+
+
+
+1.) Classifation tree
+======================
+
+  ```{r tree}
+    library(rpart)
+    fit1<-rpart(classe~.,data=trainproc,method="class")
+  ```
+  
+*1.1) Plotting the classification tree*
+  
+  ```{r plot}
+    library(rattle)
+    fancyRpartPlot(fit1)
+  ```
+  
+*1.2) Accuracy of the model*
+
+So clearly this model provides us with 71% accuracy approximately.
+
+
+  ```{r accu1,cache=TRUE}
+    confusionMatrix(testproc$classe,predict(fit1,testproc,type="class"))
+  ```  
+  
+2.) Random forest
+================
+
+  ```{r forest,cache=TRUE}
+    forestcontrol<-trainControl(method="cv",number=3)
+    fit2<-train(classe~.,data=trainproc,method="rf",trControl=forestcontrol)
+  ``` 
+
+*2.1) Accuracy of the model* 
+
+This model shows an accuracy of 99.25 percent which is great, but still we would check for a model for boosting.
+
+  ```{r accu2}
+    confusionMatrix(testproc$classe,predict(fit2,testproc))
+  ```  
+ 
+3.) Boosting
+=================
+
+  ```{r boost,cache=TRUE}
+  controlboost<-trainControl(method="repeatedcv",number=3,repeats=1)
+  fit3<-train(classe~.,data=trainproc,method="gbm",trControl=controlboost,verbose=FALSE)
+  ```
+  
+*3.1) Accuracy of the model*
+
+This model shows an accuracy of 94.26% percent which is good but not better than random forest model.
+
+  ```{r accu3}
+    confusionMatrix(testproc$classe,predict(fit3,testproc))
+  ```
+  
+Best Model
+==============
+
+Clearly the best possible model to predict classe is with the random forest one with 99.25 percent accuracy.
+
+
+Predicting the test model
+==================
+
+The given values are as predicted by our model:
+
+
+  ```{r predict}
+    subvalid<-predict(proc,validation)
+    predict(fit2,subvalid)
+  ```  
